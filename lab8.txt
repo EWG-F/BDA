@@ -1,0 +1,162 @@
+LAB 8 - WORD COUNT USING HADOOP AND SPARK
+
+WHAT THIS LAB DOES
+The program counts how many times each word appears in a text file.
+This lab has two parts:
+A. Hadoop MapReduce using mapper.py and reducer.py
+B. Spark using a PySpark program
+
+WHERE TO DO IT
+Use the Ubuntu terminal.
+For the Hadoop part, Hadoop must be installed and running.
+For the Spark part, PySpark/Spark must be installed.
+
+A. CREATE A WORK FOLDER AND INPUT FILE
+
+   mkdir -p ~/lab8
+   cd ~/lab8
+
+Create the input file:
+   nano input.txt
+
+Paste:
+   bangalore
+   hubli
+   bangalore
+   mysore
+   bangalore
+
+Save and close.
+
+B. HADOOP PART - CREATE mapper.py
+
+   nano mapper.py
+
+Paste:
+   #!/usr/bin/env python3
+   import sys
+
+   for line in sys.stdin:
+       line = line.strip()
+       words = line.split()
+
+       for word in words:
+           print("{}\t{}".format(word, 1))
+
+Save and close.
+
+C. HADOOP PART - CREATE reducer.py
+
+   nano reducer.py
+
+Paste:
+   #!/usr/bin/env python3
+   import sys
+   from collections import defaultdict
+
+   word_counts = defaultdict(int)
+
+   for line in sys.stdin:
+       try:
+           line = line.strip()
+           word, count = line.split()
+           word_counts[word] += int(count)
+       except ValueError:
+           continue
+
+   for word, count in sorted(word_counts.items()):
+       print("{}\t{}".format(word, count))
+
+Save and close.
+
+D. TEST THE HADOOP PROGRAM LOCALLY
+
+Run:
+   cat input.txt | python3 mapper.py | sort -k1,1 | python3 reducer.py
+
+EXPECTED OUTPUT:
+   bangalore    3
+   hubli        1
+   mysore       1
+
+E. RUN THE WORD COUNT USING HADOOP
+
+1. Start Hadoop:
+   start-dfs.sh
+   start-yarn.sh
+
+2. Upload input.txt:
+   hdfs dfs -mkdir -p /lab8/input
+   hdfs dfs -put -f input.txt /lab8/input/
+
+3. Find the Streaming JAR:
+   STREAMING_JAR=$(find "$HADOOP_HOME/share/hadoop/tools/lib" -name 'hadoop-streaming-*.jar' | head -n 1)
+
+4. Run:
+   hadoop jar "$STREAMING_JAR" \
+     -files mapper.py,reducer.py \
+     -mapper "python3 mapper.py" \
+     -reducer "python3 reducer.py" \
+     -input /lab8/input/input.txt \
+     -output /lab8/output
+
+If the output directory already exists:
+   hdfs dfs -rm -r /lab8/output
+
+5. Display the Hadoop output:
+   hdfs dfs -cat /lab8/output/part-00000
+
+EXPECTED OUTPUT:
+   bangalore    3
+   hubli        1
+   mysore       1
+
+F. SPARK PART - CREATE spark_wordcount.py
+
+The manual's Program 8 section shows the Hadoop mapper and reducer, but it does not
+provide a separate Spark source-code listing. The following PySpark code is added so
+you can perform the Spark part named in the experiment.
+
+Create:
+   nano spark_wordcount.py
+
+Paste:
+   from pyspark.sql import SparkSession
+
+   spark = SparkSession.builder.appName("WordCount").getOrCreate()
+   sc = spark.sparkContext
+
+   text = sc.textFile("input.txt")
+
+   counts = (
+       text.flatMap(lambda line: line.split())
+           .map(lambda word: (word, 1))
+           .reduceByKey(lambda a, b: a + b)
+           .sortByKey()
+   )
+
+   for word, count in counts.collect():
+       print(word, count)
+
+   spark.stop()
+
+Save and close.
+
+G. RUN THE SPARK PROGRAM
+
+Check Spark is installed:
+   spark-submit --version
+
+Run:
+   spark-submit spark_wordcount.py
+
+EXPECTED OUTPUT:
+   bangalore 3
+   hubli 1
+   mysore 1
+
+If "spark-submit: command not found" appears, Spark is not installed or its bin folder
+is not in PATH. The Hadoop part can still be completed independently.
+
+CONCLUSION
+Word count was performed using Hadoop Streaming and a PySpark RDD program.

@@ -1,0 +1,235 @@
+LAB 1 - HADOOP FILE MANAGEMENT
+
+WHAT THIS LAB DOES
+You will start Hadoop and practise creating folders, uploading files, viewing/downloading
+files, and deleting files in HDFS (Hadoop's storage system).
+
+WHERE TO DO IT
+Use an Ubuntu terminal. If you use Windows, open your Ubuntu/WSL terminal.
+Do not type these Linux commands in Windows Command Prompt.
+
+BEFORE YOU START
+You need Java, Hadoop and SSH installed. The manual uses Hadoop 3.4.0.
+If Hadoop is already installed on your computer, skip to "START HADOOP".
+
+A. INSTALL THE REQUIRED SOFTWARE
+
+1. Update Ubuntu:
+   sudo apt update
+
+2. Install Java and SSH:
+   sudo apt install openjdk-11-jdk openssh-server openssh-client -y
+
+3. Check Java:
+   java -version
+   javac -version
+
+4. Start SSH:
+   sudo systemctl enable --now ssh
+
+5. Create an SSH key so Hadoop can start its services:
+   mkdir -p ~/.ssh
+   ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa
+   cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+   chmod 600 ~/.ssh/authorized_keys
+   ssh localhost
+
+If SSH asks whether you trust localhost, type yes and press Enter.
+If you already have an SSH key, do not overwrite it. You can skip ssh-keygen.
+
+6. Download Hadoop 3.4.0:
+   wget https://dlcdn.apache.org/hadoop/common/hadoop-3.4.0/hadoop-3.4.0.tar.gz
+
+7. Extract it:
+   tar -xzf hadoop-3.4.0.tar.gz
+
+This creates a folder named hadoop-3.4.0 in your current folder.
+
+B. SET HADOOP ENVIRONMENT VARIABLES
+
+1. Open your Bash settings:
+   nano ~/.bashrc
+
+2. Add these lines at the bottom:
+   export JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$(which javac)")")")
+   export HADOOP_HOME=$HOME/hadoop-3.4.0
+   export HADOOP_INSTALL=$HADOOP_HOME
+   export HADOOP_MAPRED_HOME=$HADOOP_HOME
+   export HADOOP_COMMON_HOME=$HADOOP_HOME
+   export HADOOP_HDFS_HOME=$HADOOP_HOME
+   export YARN_HOME=$HADOOP_HOME
+   export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+
+3. Save in nano:
+   Press Ctrl+O, Enter, then Ctrl+X.
+
+4. Apply the settings:
+   source ~/.bashrc
+
+5. Check Hadoop:
+   hadoop version
+
+C. CONFIGURE HADOOP
+
+Open each file with nano, remove its old configuration content, and paste the
+configuration shown below. Save with Ctrl+O, Enter, Ctrl+X.
+
+1. Configure Java:
+   nano $HADOOP_HOME/etc/hadoop/hadoop-env.sh
+
+Add or update this line:
+   export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+
+If your Java is installed in a different folder, check it with:
+   readlink -f /usr/bin/javac
+Use the Java folder path that belongs before /bin/javac.
+
+2. Configure core-site.xml:
+   nano $HADOOP_HOME/etc/hadoop/core-site.xml
+
+Paste:
+   <configuration>
+     <property>
+       <name>fs.defaultFS</name>
+       <value>hdfs://localhost:9000</value>
+     </property>
+     <property>
+       <name>hadoop.tmp.dir</name>
+       <value>/tmp/hadoop-tmp</value>
+     </property>
+   </configuration>
+
+3. Create the storage folders:
+   mkdir -p /tmp/hadoop-data/nn
+   mkdir -p /tmp/hadoop-data/dn
+   mkdir -p /tmp/hadoop-tmp
+
+4. Configure hdfs-site.xml:
+   nano $HADOOP_HOME/etc/hadoop/hdfs-site.xml
+
+Paste:
+   <configuration>
+     <property>
+       <name>dfs.namenode.name.dir</name>
+       <value>file:///tmp/hadoop-data/nn</value>
+     </property>
+     <property>
+       <name>dfs.datanode.data.dir</name>
+       <value>file:///tmp/hadoop-data/dn</value>
+     </property>
+     <property>
+       <name>dfs.replication</name>
+       <value>1</value>
+     </property>
+   </configuration>
+
+5. Create mapred-site.xml from the template:
+   cp $HADOOP_HOME/etc/hadoop/mapred-site.xml.template $HADOOP_HOME/etc/hadoop/mapred-site.xml
+   nano $HADOOP_HOME/etc/hadoop/mapred-site.xml
+
+Paste:
+   <configuration>
+     <property>
+       <name>mapreduce.framework.name</name>
+       <value>yarn</value>
+     </property>
+   </configuration>
+
+6. Configure yarn-site.xml:
+   nano $HADOOP_HOME/etc/hadoop/yarn-site.xml
+
+Paste:
+   <configuration>
+     <property>
+       <name>yarn.nodemanager.aux-services</name>
+       <value>mapreduce_shuffle</value>
+     </property>
+   </configuration>
+
+IMPORTANT:
+The manual repeats the key "dfs.data.dir" for both NameNode and DataNode.
+That is a mistake. This guide uses the separate correct keys:
+dfs.namenode.name.dir and dfs.datanode.data.dir.
+The manual uses the older name fs.default.name; this guide uses fs.defaultFS.
+
+D. FORMAT AND START HADOOP
+
+IMPORTANT: Format the NameNode only the first time you create this Hadoop setup.
+Do not format it every time you start Hadoop. Formatting an existing NameNode can
+make the old HDFS data unavailable.
+
+1. First-time setup only:
+   hdfs namenode -format
+
+2. Start HDFS:
+   start-dfs.sh
+
+3. Start YARN:
+   start-yarn.sh
+
+4. Check the services:
+   jps
+
+You should see processes such as:
+   NameNode
+   DataNode
+   SecondaryNameNode
+   ResourceManager
+   NodeManager
+
+5. Optional: open the Hadoop pages in your browser:
+   NameNode:          http://localhost:9870
+   DataNode:          http://localhost:9864
+   YARN ResourceMgr:  http://localhost:8088
+
+E. PERFORM THE FILE-MANAGEMENT TASKS
+
+1. Make a sample file on your Ubuntu computer:
+   nano sample.txt
+
+Type:
+   This is my first HDFS file.
+   I am learning Hadoop file management.
+
+Save and close nano.
+
+2. Create a folder in HDFS:
+   hdfs dfs -mkdir -p /user/$USER/input
+
+3. Upload the local file to HDFS:
+   hdfs dfs -put sample.txt /user/$USER/input/
+
+4. Check that it was uploaded:
+   hdfs dfs -ls /user/$USER/input
+
+5. Read the file directly from HDFS:
+   hdfs dfs -cat /user/$USER/input/sample.txt
+
+6. Download a copy from HDFS to your current Ubuntu folder:
+   hdfs dfs -get /user/$USER/input/sample.txt downloaded_sample.txt
+
+7. Check the downloaded copy:
+   cat downloaded_sample.txt
+
+8. Delete the file from HDFS:
+   hdfs dfs -rm /user/$USER/input/sample.txt
+
+9. Delete the HDFS folder:
+   hdfs dfs -rm -r /user/$USER/input
+
+F. STOP HADOOP WHEN FINISHED
+
+   stop-yarn.sh
+   stop-dfs.sh
+
+EXPECTED OUTPUT
+
+After "jps", the Hadoop processes should be listed.
+After "hdfs dfs -ls", sample.txt should appear in the input folder.
+After "hdfs dfs -cat", the two lines from sample.txt should appear.
+After "hdfs dfs -get", downloaded_sample.txt should exist on your computer.
+After "hdfs dfs -rm", Hadoop should report that the file was deleted.
+
+CONCLUSION
+Hadoop was started and HDFS commands were used to create folders, upload, view,
+download and delete files.

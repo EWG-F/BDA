@@ -1,0 +1,128 @@
+LAB 4 - MOVIELENS MOVIE TAGS USING MAPREDUCE
+
+WHAT THIS LAB DOES
+It reads the MovieLens tags.csv file and collects all tags for each movie ID.
+
+WHERE TO DO IT
+Use the Ubuntu terminal. You can test locally first.
+For the Hadoop run, Hadoop must be running.
+
+A. CREATE A WORK FOLDER
+
+   mkdir -p ~/lab4
+   cd ~/lab4
+
+B. CREATE tags.csv
+
+   nano tags.csv
+
+Paste:
+   userId,movieId,tag,timestamp
+   15,1,funny,1215184630
+   20,2,Robin Williams,1215184631
+   15,1,Pixar,1215184633
+
+Save and close nano.
+
+Optional: the manual also shows movies.csv:
+   movieId,title,genres
+   1,Toy Story (1995),Adventure|Animation|Children|Comedy|Fantasy
+   2,Jumanji (1995),Adventure|Children|Fantasy
+
+The Mapper/Reducer below only reads tags.csv. It outputs movie IDs and tags; it does
+not look up movie titles from movies.csv.
+
+C. CREATE THE MAPPER
+
+   nano mapper.py
+
+Paste:
+   #!/usr/bin/env python3
+   import sys
+   import csv
+
+   reader = csv.reader(sys.stdin)
+   next(reader, None)  # Skip the header row
+
+   for row in reader:
+       if len(row) >= 3:
+           movie_id = row[1]
+           tag = row[2].strip()
+           print(f"{movie_id}\t{tag}")
+
+Save and close.
+
+D. CREATE THE REDUCER
+
+   nano reducer.py
+
+Paste:
+   #!/usr/bin/env python3
+   import sys
+
+   current_movie = None
+   tags = []
+
+   for line in sys.stdin:
+       movie_id, tag = line.rstrip("\n").split("\t", 1)
+
+       if current_movie == movie_id:
+           tags.append(tag)
+       else:
+           if current_movie is not None:
+               print(f"{current_movie}\t{','.join(tags)}")
+           current_movie = movie_id
+           tags = [tag]
+
+   if current_movie is not None:
+       print(f"{current_movie}\t{','.join(tags)}")
+
+Save and close.
+
+E. TEST LOCALLY
+
+Run:
+   cat tags.csv | python3 mapper.py | sort -k1,1 | python3 reducer.py
+
+EXPECTED OUTPUT:
+   1    funny,Pixar
+   2    Robin Williams
+
+The tags for movie ID 1 are grouped together.
+The tag for movie ID 2 is shown on its own.
+
+F. RUN USING HADOOP STREAMING
+
+1. Start Hadoop:
+   start-dfs.sh
+   start-yarn.sh
+
+2. Upload tags.csv:
+   hdfs dfs -mkdir -p /lab4/input
+   hdfs dfs -put -f tags.csv /lab4/input/
+
+3. Find the Streaming JAR:
+   STREAMING_JAR=$(find "$HADOOP_HOME/share/hadoop/tools/lib" -name 'hadoop-streaming-*.jar' | head -n 1)
+
+4. Run the job:
+   hadoop jar "$STREAMING_JAR" \
+     -files mapper.py,reducer.py \
+     -mapper "python3 mapper.py" \
+     -reducer "python3 reducer.py" \
+     -input /lab4/input/tags.csv \
+     -output /lab4/output
+
+If the output folder already exists:
+   hdfs dfs -rm -r /lab4/output
+
+5. Read the result:
+   hdfs dfs -cat /lab4/output/part-00000
+
+IMPORTANT CORRECTION
+The manual's example command feeds both movies.csv and tags.csv into a Mapper that expects
+the tags.csv columns. That can produce incorrect records. Use tags.csv only for this program.
+The manual's output also mixes movie titles/genres with tag output; the code shown here
+groups tags by movie ID only.
+
+CONCLUSION
+Movie tags were grouped by movie ID using the MapReduce Mapper and Reducer.

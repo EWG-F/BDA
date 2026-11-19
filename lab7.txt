@@ -1,0 +1,193 @@
+LAB 7 - HIVE DATABASE, TABLE, VIEW, FUNCTION AND INDEX COMMANDS
+
+WHAT THIS LAB DOES
+You will use HiveQL commands to create, change, view and delete a database, table,
+view, function and index.
+
+WHERE TO DO IT
+Use the Hive Query Editor in HUE, or type "hive" in a Cloudera terminal and then
+enter the HiveQL commands at the hive prompt.
+Do not type HiveQL commands into the normal Ubuntu prompt.
+
+A. START HADOOP AND OPEN HIVE
+
+Start Hadoop:
+   start-dfs.sh
+   start-yarn.sh
+
+Open Hive shell:
+   hive
+
+OR open HUE in your browser and choose:
+   Query Editors -> Hive
+
+B. CREATE A DATABASE AND SELECT IT
+
+Run these commands in Hive:
+
+   CREATE DATABASE employee_db;
+   USE employee_db;
+
+Expected result:
+Hive shows OK. The current database becomes employee_db.
+
+C. CHANGE DATABASE PROPERTIES
+
+   ALTER DATABASE employee_db
+   SET DBPROPERTIES ('Owner'='Admin');
+
+Expected result:
+Hive shows OK.
+
+D. CREATE THE INPUT FILE
+
+Open a separate Ubuntu terminal tab/window (not the Hive prompt) and create:
+   nano employees.txt
+
+Paste:
+   101,John,30,1,50000
+   102,Sam,28,2,60000
+   103,Anna,32,1,75000
+   104,David,29,3,62000
+   105,Lily,27,2,58000
+
+Save and close.
+
+Upload it to HDFS:
+   hdfs dfs -mkdir -p /user/cloudera
+   hdfs dfs -put -f employees.txt /user/cloudera/
+
+Return to Hive or the HUE Hive editor.
+
+E. CREATE A TABLE
+
+   USE employee_db;
+
+   CREATE TABLE employees (
+     emp_id INT,
+     name STRING,
+     age INT,
+     dept_id INT,
+     salary FLOAT
+   )
+   ROW FORMAT DELIMITED
+   FIELDS TERMINATED BY ','
+   STORED AS TEXTFILE;
+
+Expected result:
+OK - table employees is created.
+
+F. LOAD THE DATA
+
+   LOAD DATA INPATH '/user/cloudera/employees.txt'
+   INTO TABLE employees;
+
+Expected result:
+Hive reports that data is loaded into employee_db.employees.
+
+G. ADD A COLUMN
+
+   ALTER TABLE employees ADD COLUMNS (email STRING);
+
+Expected result:
+OK - the email column is added.
+
+H. CREATE AND CHANGE A VIEW
+
+Create:
+   CREATE VIEW high_salary_employees AS
+   SELECT emp_id, name, salary
+   FROM employees
+   WHERE salary > 50000;
+
+Change the view:
+   ALTER VIEW high_salary_employees AS
+   SELECT emp_id, name, age, salary
+   FROM employees
+   WHERE salary > 60000;
+
+See the view:
+   SELECT * FROM high_salary_employees;
+
+Delete the view:
+   DROP VIEW high_salary_employees;
+
+I. CREATE AND USE A CUSTOM FUNCTION (OPTIONAL)
+
+The manual refers to a Java UDF JAR named custom_udf.jar.
+That JAR is NOT included in the lab manual. You must obtain/build the JAR and upload
+it to HDFS before these commands will work.
+
+If the JAR is available, run:
+   ADD JAR /user/cloudera/custom_udf.jar;
+
+   CREATE FUNCTION to_upper
+   AS 'com.example.hiveudf.ToUpperUDF';
+
+Test it:
+   SELECT to_upper(name) FROM employees;
+
+Delete it:
+   DROP FUNCTION to_upper;
+
+If the JAR file or Java class is missing, this section cannot run as written.
+
+J. CREATE, REBUILD AND DELETE AN INDEX (VERSION-DEPENDENT)
+
+The manual uses the old Hive compact-index feature. Some modern Hive versions do not
+support Hive indexes. Try these commands only if your Hive version supports them.
+
+Create:
+   CREATE INDEX emp_dept_idx
+   ON TABLE employees (dept_id)
+   AS 'org.apache.hadoop.hive.ql.index.compact.CompactIndexHandler'
+   WITH DEFERRED REBUILD;
+
+Rebuild:
+   ALTER INDEX emp_dept_idx ON employees REBUILD;
+
+Delete:
+   DROP INDEX emp_dept_idx ON employees;
+
+If Hive reports that indexes are unsupported, record that your installed Hive version
+does not support this old index feature. Continue with the other parts of the lab.
+
+K. CHECK TABLES AND TABLE COLUMNS
+
+Show tables:
+   SHOW TABLES;
+
+Describe the table:
+   DESCRIBE employees;
+
+Display the first five rows:
+   SELECT * FROM employees LIMIT 5;
+
+EXPECTED OUTPUT FOR SELECT
+
+   101  John   30  1  50000
+   102  Sam    28  2  60000
+   103  Anna   32  1  75000
+   104  David  29  3  62000
+   105  Lily   27  2  58000
+
+L. RENAME AND DROP THE TABLE
+
+Do this after you have finished the queries and view/function/index tests.
+
+   ALTER TABLE employees RENAME TO employees_new;
+   DROP TABLE employees_new;
+
+M. DROP THE DATABASE - DO THIS LAST
+
+   DROP DATABASE employee_db CASCADE;
+
+This removes the database and its tables. Do not do this before finishing the lab.
+
+IMPORTANT ORDER FIX
+The manual drops employee_db before creating the table, and it renames/drops the table
+before later view commands. That order breaks the later steps. This guide moves all
+drop commands to the end so each section can be executed.
+
+CONCLUSION
+Hive commands were used to create, alter, query and drop database objects.

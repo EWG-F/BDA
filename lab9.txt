@@ -1,0 +1,178 @@
+LAB 9 - CDH AND HUE DATA ANALYSIS AND REPORTS
+
+WHAT THIS LAB DOES
+You will use Cloudera's HUE website to upload employee data, create a Hive table,
+run SQL queries, export the results and create a chart/dashboard.
+
+WHERE TO DO IT
+You need a Cloudera/CDH environment with HUE and Hive installed and running.
+This is not a normal Python program. Most of the work is done in a web browser.
+If your computer only has plain Apache Hadoop, HUE/CDH may not be installed.
+
+A. START CLOUDERA SERVICES
+
+Open the Cloudera terminal and run these one at a time:
+
+   sudo service cloudera-scm-server start
+   sudo service cloudera-scm-agent start
+
+Check:
+   sudo service --status-all | grep cloudera
+
+NOTE:
+The manual has a typing mistake in the agent command. It should end in "start".
+
+B. OPEN HUE
+
+1. Open a browser.
+2. Go to:
+   http://localhost:8888
+3. Sign in with your Cloudera/HUE account.
+
+The manual's example login is:
+   Username: cloudera
+   Password: cloudera
+
+Your actual login may be different.
+
+C. CREATE THE EMPLOYEE CSV FILE
+
+On your computer, create a file named employees.csv.
+
+It should contain these lines:
+   id,name,department,salary
+   1,John,IT,70000
+   2,Alice,HR,60000
+   3,Bob,IT,75000
+   4,Charlie,Finance,80000
+   5,David,HR,62000
+   6,Eva,IT,72000
+   7,Frank,Finance,81000
+   8,Grace,HR,65000
+
+D. UPLOAD THE FILE TO HDFS USING HUE
+
+1. In HUE, open File Browser.
+2. Choose HDFS.
+3. Create this folder:
+   /user/cloudera/data
+4. Open that folder.
+5. Click Upload.
+6. Select employees.csv and upload it.
+
+The manual also gives a terminal method. Use this only if you prefer the terminal:
+   hdfs dfs -mkdir -p /user/cloudera/data
+   hdfs dfs -put -f employees.csv /user/cloudera/data/
+
+HEADER NOTE
+The CSV has a first line containing column names. If Hive displays that line as a
+record, remove the header before uploading or configure Hive to skip one header line.
+For the simplest lab run, remove the first line and upload the remaining eight data rows.
+
+E. OPEN THE HIVE QUERY EDITOR
+
+In HUE:
+   Query Editors -> Hive
+
+You will type the following SQL commands in this editor, not in the Linux terminal.
+
+F. CREATE THE DATABASE AND TABLE
+
+Run:
+
+   CREATE DATABASE IF NOT EXISTS company;
+   USE company;
+
+   CREATE TABLE employees (
+     id INT,
+     name STRING,
+     department STRING,
+     salary INT
+   )
+   ROW FORMAT DELIMITED
+   FIELDS TERMINATED BY ','
+   STORED AS TEXTFILE;
+
+Expected result:
+Hive reports OK and creates the employees table.
+
+G. LOAD THE CSV DATA
+
+Run:
+   LOAD DATA INPATH '/user/cloudera/data/employees.csv'
+   INTO TABLE employees;
+
+If you uploaded a file without the header, this loads the eight employee rows.
+If you chose a different HDFS folder or file name, use that exact path in the command.
+
+H. CHECK THE DATA
+
+Run:
+   SELECT * FROM employees;
+
+EXPECTED OUTPUT
+
+   1  John     IT       70000
+   2  Alice    HR       60000
+   3  Bob      IT       75000
+   4  Charlie  Finance  80000
+   5  David    HR       62000
+   6  Eva      IT       72000
+   7  Frank    Finance  81000
+   8  Grace    HR       65000
+
+I. FIND THE HIGHEST SALARY IN EACH DEPARTMENT
+
+Run:
+   SELECT department, MAX(salary) AS highest_salary
+   FROM employees
+   GROUP BY department;
+
+EXPECTED OUTPUT:
+   Finance    81000
+   HR         65000
+   IT         75000
+
+J. FIND EMPLOYEES WITH SALARY GREATER THAN 65000
+
+Run:
+   SELECT name, department, salary
+   FROM employees
+   WHERE salary > 65000;
+
+EXPECTED OUTPUT:
+   John     IT       70000
+   Bob      IT       75000
+   Charlie  Finance  80000
+   Eva      IT       72000
+   Frank    Finance  81000
+
+K. EXPORT A REPORT
+
+1. Run one of the queries above in HUE's Hive Query Editor.
+2. Click Export.
+3. Choose CSV, Excel or JSON.
+4. Download the report.
+
+L. CREATE A HUE DASHBOARD / CHART
+
+1. Open Dashboard in HUE.
+2. Click Create New Dashboard.
+3. Click Add Widget.
+4. Choose a chart, such as Bar Chart or Pie Chart.
+5. Use this query to count employees in each department:
+
+   SELECT department, COUNT(*) AS employee_count
+   FROM employees
+   GROUP BY department;
+
+6. Click Run Query and save/add the chart to the dashboard.
+
+EXPECTED OUTPUT:
+   Finance    2
+   HR         3
+   IT         3
+
+CONCLUSION
+HUE was used to upload a dataset, run Hive queries, analyse department salaries,
+export query results and display a department-count chart.

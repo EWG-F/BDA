@@ -1,0 +1,122 @@
+LAB 3 - WEATHER DATA USING MAPREDUCE
+
+WHAT THIS LAB DOES
+The Mapper reads a date, temperature and weather condition.
+The Reducer labels the day:
+- Temperature greater than 25 = Hot Day
+- Temperature 25 or lower = Cold Day
+
+WHERE TO DO IT
+Use the Ubuntu terminal. You can test locally with Python first.
+For the Hadoop run, Hadoop must be running.
+
+A. CREATE A WORK FOLDER
+
+   mkdir -p ~/lab3
+   cd ~/lab3
+
+B. CREATE THE INPUT FILE
+
+   nano weather.txt
+
+Paste:
+   date temperature condition
+   2026-01-01 30 sunny
+   2026-01-02 20 cloudy
+   2026-01-03 28 sunny
+   2026-01-04 18 rainy
+
+Save and close nano.
+
+C. CREATE THE MAPPER
+
+   nano weather_mapper.py
+
+Paste:
+   #!/usr/bin/env python3
+   import sys
+
+   for line in sys.stdin:
+       parts = line.strip().split()
+
+       if not parts or parts[0].lower() == "date":
+           continue
+
+       try:
+           date = parts[0]
+           temperature = float(parts[1])
+           condition = parts[2]
+           print(f"{date}\t{temperature}\t{condition}")
+       except (IndexError, ValueError):
+           continue
+
+Save and close.
+
+D. CREATE THE REDUCER
+
+   nano weather_reducer.py
+
+Paste:
+   #!/usr/bin/env python3
+   import sys
+
+   for line in sys.stdin:
+       date, temp, condition = line.strip().split("\t")
+       temp = float(temp)
+
+       if temp > 25:
+           classification = "Hot Day"
+       else:
+           classification = "Cold Day"
+
+       print(f"{date}\t{classification}")
+
+Save and close.
+
+E. TEST LOCALLY
+
+Run this one command:
+   cat weather.txt | python3 weather_mapper.py | sort -k1,1 | python3 weather_reducer.py
+
+EXPECTED OUTPUT:
+   2026-01-01    Hot Day
+   2026-01-02    Cold Day
+   2026-01-03    Hot Day
+   2026-01-04    Cold Day
+
+F. RUN USING HADOOP STREAMING
+
+1. Start Hadoop:
+   start-dfs.sh
+   start-yarn.sh
+
+2. Upload the data:
+   hdfs dfs -mkdir -p /lab3/input
+   hdfs dfs -put -f weather.txt /lab3/input/
+
+3. Find the Streaming JAR:
+   STREAMING_JAR=$(find "$HADOOP_HOME/share/hadoop/tools/lib" -name 'hadoop-streaming-*.jar' | head -n 1)
+
+4. Run the job:
+   hadoop jar "$STREAMING_JAR" \
+     -files weather_mapper.py,weather_reducer.py \
+     -mapper "python3 weather_mapper.py" \
+     -reducer "python3 weather_reducer.py" \
+     -input /lab3/input/weather.txt \
+     -output /lab3/output
+
+If the output folder exists from an earlier run:
+   hdfs dfs -rm -r /lab3/output
+
+5. See the output:
+   hdfs dfs -cat /lab3/output/part-00000
+
+EXPECTED OUTPUT
+The same four dates and Hot Day / Cold Day labels shown in section E.
+
+IMPORTANT
+The manual passes the condition field to the Reducer, but the classification code checks
+temperature only. The word "sunny" does not affect the result in this version.
+
+CONCLUSION
+Weather data was read and each day was classified using its temperature.

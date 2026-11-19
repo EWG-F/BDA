@@ -1,0 +1,173 @@
+LAB 2 - MATRIX MULTIPLICATION USING MAPREDUCE
+
+WHAT THIS LAB DOES
+It multiplies two 2 x 2 matrices using a Mapper and a Reducer.
+
+WHERE TO DO IT
+Use the Ubuntu terminal. Hadoop must be installed and running for the Hadoop run.
+First test it locally; then run it through Hadoop Streaming.
+
+A. CREATE A WORK FOLDER
+
+   mkdir -p ~/lab2
+   cd ~/lab2
+
+B. CREATE THE MAPPER
+
+1. Open a new file:
+   nano mapper.py
+
+2. Paste this code:
+
+   #!/usr/bin/env python3
+   import sys
+
+   n = 2   # Shared dimension
+   p = 2   # Number of columns in matrix B
+
+   for line in sys.stdin:
+       parts = line.strip().split()
+       if len(parts) != 4:
+           continue
+
+       matrix = parts[0]
+       i = int(parts[1])
+       j = int(parts[2])
+       value = int(parts[3])
+
+       if matrix == "A":
+           for k in range(p):
+               print(f"{i},{k}\tA,{j},{value}")
+       else:
+           for k in range(n):
+               print(f"{k},{j}\tB,{i},{value}")
+
+3. Save: Ctrl+O, Enter, Ctrl+X.
+
+C. CREATE THE REDUCER
+
+1. Open:
+   nano reducer.py
+
+2. Paste:
+
+   #!/usr/bin/env python3
+   import sys
+   from collections import defaultdict
+
+   current_key = None
+   a_values = defaultdict(int)
+   b_values = defaultdict(int)
+
+   def emit_result(key, a_vals, b_vals):
+       total = 0
+       for k in a_vals:
+           if k in b_vals:
+               total += a_vals[k] * b_vals[k]
+       print(f"{key}\t{total}")
+
+   for line in sys.stdin:
+       key, value = line.strip().split("\t")
+       if current_key != key:
+           if current_key is not None:
+               emit_result(current_key, a_values, b_values)
+           current_key = key
+           a_values = defaultdict(int)
+           b_values = defaultdict(int)
+
+       matrix, k, val = value.split(",")
+       k = int(k)
+       val = int(val)
+
+       if matrix == "A":
+           a_values[k] = val
+       else:
+           b_values[k] = val
+
+   if current_key is not None:
+       emit_result(current_key, a_values, b_values)
+
+3. Save and close nano.
+
+D. CREATE THE TWO INPUT FILES
+
+1. Create matrix_a.txt:
+   nano matrix_a.txt
+
+Paste:
+   A 0 0 1
+   A 0 1 2
+   A 1 0 3
+   A 1 1 4
+
+Save and close.
+
+2. Create matrix_b.txt:
+   nano matrix_b.txt
+
+Paste:
+   B 0 0 5
+   B 0 1 6
+   B 1 0 7
+   B 1 1 8
+
+Save and close.
+
+The four columns mean:
+Matrix name, row number, column number, value.
+The A and B at the start tell the Mapper which matrix the value belongs to.
+
+E. TEST WITHOUT HADOOP FIRST
+
+Run:
+   cat matrix_a.txt matrix_b.txt | python3 mapper.py | sort -k1,1 | python3 reducer.py
+
+EXPECTED OUTPUT:
+   0,0    19
+   0,1    22
+   1,0    43
+   1,1    50
+
+This represents the answer matrix:
+   19  22
+   43  50
+
+F. RUN IT USING HADOOP
+
+1. Start Hadoop if it is not running:
+   start-dfs.sh
+   start-yarn.sh
+
+2. Create an HDFS input folder:
+   hdfs dfs -mkdir -p /lab2/input
+
+3. Upload both input files:
+   hdfs dfs -put -f matrix_a.txt /lab2/input/
+   hdfs dfs -put -f matrix_b.txt /lab2/input/
+
+4. Find the Hadoop Streaming JAR:
+   STREAMING_JAR=$(find "$HADOOP_HOME/share/hadoop/tools/lib" -name 'hadoop-streaming-*.jar' | head -n 1)
+
+5. Run the job:
+   hadoop jar "$STREAMING_JAR" \
+     -files mapper.py,reducer.py \
+     -mapper "python3 mapper.py" \
+     -reducer "python3 reducer.py" \
+     -input /lab2/input/matrix_a.txt \
+     -input /lab2/input/matrix_b.txt \
+     -output /lab2/output
+
+If Hadoop says the output folder already exists, remove it before running again:
+   hdfs dfs -rm -r /lab2/output
+
+6. Display the result:
+   hdfs dfs -cat /lab2/output/part-00000
+
+EXPECTED OUTPUT
+   0,0    19
+   0,1    22
+   1,0    43
+   1,1    50
+
+CONCLUSION
+The Mapper and Reducer multiplied matrix A by matrix B and produced the result matrix.

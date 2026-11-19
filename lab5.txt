@@ -1,0 +1,141 @@
+LAB 5 - MONGODB COUNT, SORT, LIMIT, SKIP AND AGGREGATE
+
+WHAT THIS LAB DOES
+You will insert employee records into MongoDB and run queries to:
+1. Count employees
+2. Sort employees by salary
+3. Display only a limited number of records
+4. Skip records
+5. Use aggregate operations
+
+WHERE TO DO IT
+Use MongoDB Shell (mongosh). Do not type these commands into the normal Ubuntu shell.
+Open mongosh first; then type the MongoDB commands below.
+
+A. START MONGODB SHELL
+
+If MongoDB is already installed and running:
+   mongosh
+
+If you use MongoDB Compass, you can open its embedded shell or connect with mongosh.
+MongoDB Server must be running before the shell can query your database.
+
+B. SELECT A DATABASE
+
+At the mongosh prompt, type:
+   use company
+
+C. INSERT THE EMPLOYEE DATA
+
+Copy and run the complete command below in mongosh:
+
+db.employee.insertMany([
+  {_id:1,name:"Kavana",age:25,email:"Kavana@example.com",city:"Chicago",Department:"Finance",Gender:"Female",salary:90000,JoiningDate:new Date("2020-05-18")},
+  {_id:2,name:"Laksmi",age:30,email:"Laksmi@example.com",city:"Chicago",Department:"HR Dept",Gender:"Female",salary:80000,JoiningDate:new Date("2021-06-25")},
+  {_id:3,name:"AMRUTHA",age:35,email:"AMRUTHA@example.com",city:"Los Angeles",Department:"Development",Gender:"Female",salary:70000,JoiningDate:new Date("2022-06-25")},
+  {_id:4,name:"PANCHAMI C H",age:35,email:"PANCHAMI@example.com",city:"Los Angeles",Department:"Development",Gender:"Female",salary:70000,JoiningDate:new Date("2022-06-25")},
+  {_id:5,name:"Rajesh",age:25,email:"Rajesh@example.com",city:"Michigan",Department:"Finance",Gender:"Male",salary:40000,JoiningDate:new Date("2015-11-25")},
+  {_id:6,name:"Akash",age:25,email:"Akash@example.com",city:"Michigan",Department:"Finance",Gender:"Male",salary:40000,JoiningDate:new Date("2020-11-25")},
+  {_id:7,name:"Nikitha",age:25,email:"Nikitha@example.com",city:"Los Angeles",Department:"HR Dept",Gender:"Female",salary:40000,JoiningDate:new Date("2018-04-25")},
+  {_id:8,name:"MUZAMMIL HUSAIN ABOOBAKAR SHANTAGERI",age:25,email:"MUZAMMIL@example.com",city:"Los Angeles",Department:"Development",Gender:"Male",salary:55000,JoiningDate:new Date("2012-04-25")},
+  {_id:9,name:"Ruthvi R Chawla",age:25,email:"Ruthvi@example.com",city:"Chicago",Department:"Finance",Gender:"Female",salary:90000,JoiningDate:new Date("2016-05-25")},
+  {_id:10,name:"Ananya",age:25,email:"Ananya@example.com",city:"Boston",Department:"HR Dept",Gender:"Female",salary:40000,JoiningDate:new Date("2015-01-25")},
+  {_id:11,name:"SHIVANI K K",age:25,email:"SHIVANIa@example.com",city:"Los Angeles",Department:"Development",Gender:"Female",salary:850000,JoiningDate:new Date("2013-01-25")},
+  {_id:12,name:"VARSHA G R",age:25,email:"VARSHA@example.com",city:"Boston",Department:"Development",Gender:"Female",salary:850000,JoiningDate:new Date("2014-07-25")},
+  {_id:13,name:"Shifa Banu",age:25,email:"Shifa@example.com",city:"Michigan",Department:"Finance",Gender:"Female",salary:990000,JoiningDate:new Date("2019-08-25")},
+  {_id:14,name:"MOHAMMED ARSHAD",age:25,email:"ARSHAD@example.com",city:"Michigan",Department:"Finance",Gender:"Male",salary:750000,JoiningDate:new Date("2021-07-19")}
+])
+
+EXPECTED RESULT
+MongoDB reports that 14 documents were inserted.
+
+If you get a duplicate _id error, the documents are already in the collection.
+Do not run the insert command again unless you clear the old collection first.
+
+D. QUERY 1 - COUNT EMPLOYEES
+
+db.employee.aggregate([
+  {$group:{_id:null,totalEmployees:{$sum:1}}}
+])
+
+EXPECTED OUTPUT
+{ "_id": null, "totalEmployees": 14 }
+
+E. QUERY 2 - SHOW FINANCE EMPLOYEES, HIGHEST SALARY FIRST
+
+db.employee.aggregate([
+  {$match:{Department:"Finance"}},
+  {$project:{name:1,age:1,Department:1,Gender:1,salary:1}},
+  {$sort:{salary:-1}}
+])
+
+EXPECTED OUTPUT (sorted by salary)
+Shifa Banu       Finance   Female   990000
+MOHAMMED ARSHAD  Finance   Male     750000
+Kavana           Finance   Female    90000
+Ruthvi R Chawla  Finance   Female    90000
+Rajesh           Finance   Male      40000
+Akash            Finance   Male      40000
+
+MongoDB may show the complete documents, including their _id values.
+
+F. QUERY 3 - SHOW ONLY THE FIRST TWO EMPLOYEES
+
+db.employee.aggregate([
+  {$limit:2}
+])
+
+EXPECTED OUTPUT
+The first two documents:
+1 - Kavana
+2 - Laksmi
+
+G. QUERY 4 - SHOW THE TOP TWO PAID FINANCE EMPLOYEES
+
+db.employee.aggregate([
+  {$match:{Department:"Finance"}},
+  {$project:{name:1,age:1,Department:1,Gender:1,salary:1}},
+  {$sort:{salary:-1}},
+  {$limit:2}
+])
+
+EXPECTED OUTPUT
+Shifa Banu       990000
+MOHAMMED ARSHAD  750000
+
+H. QUERY 5 - SKIP THE FIRST SIX EMPLOYEES
+
+db.employee.find().sort({_id:1}).skip(6)
+
+EXPECTED OUTPUT
+The displayed documents start from employee number 7:
+Nikitha, MUZAMMIL HUSAIN ABOOBAKAR SHANTAGERI, Ruthvi R Chawla,
+Ananya, SHIVANI K K, VARSHA G R, Shifa Banu and MOHAMMED ARSHAD.
+
+I. QUERY 6 - SKIP THE FIRST TWO FINANCE EMPLOYEES AFTER SORTING
+
+db.employee.aggregate([
+  {$match:{Department:"Finance"}},
+  {$project:{name:1,age:1,Department:1,Gender:1,salary:1}},
+  {$sort:{salary:-1}},
+  {$skip:2}
+])
+
+EXPECTED OUTPUT
+Kavana           Finance   90000
+Ruthvi R Chawla  Finance   90000
+Rajesh           Finance   40000
+Akash            Finance   40000
+
+WHAT THE WORDS MEAN
+$count / $sum: count how many records there are.
+$match: choose only records matching a condition.
+$project: choose which fields to show.
+$sort: arrange records. -1 means descending; 1 means ascending.
+$limit: show only the first N records.
+$skip: ignore the first N records.
+$group: put records into groups and calculate values.
+
+CONCLUSION
+MongoDB employee records were inserted and Count, Sort, Limit, Skip and Aggregate
+operations were performed.

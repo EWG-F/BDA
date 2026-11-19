@@ -1,0 +1,163 @@
+LAB 6 - PIG LATIN FILTER, PROJECT, SORT, GROUP AND JOIN
+
+WHAT THIS LAB DOES
+You will use Apache Pig to read two employee files, select rows/columns, sort salaries,
+group employees by department and join employee records to department names.
+
+WHERE TO DO IT
+Use an Ubuntu/Cloudera terminal where Hadoop, HDFS and Pig are installed.
+The Pig script reads its input files from HDFS.
+
+A. CREATE THE EMPLOYEE INPUT FILE
+
+In your working folder, create:
+   nano employees.txt
+
+Paste:
+   101,John,30,1,50000
+   102,Sam,28,2,60000
+   103,Anna,32,1,75000
+   104,David,29,3,62000
+   105,Lily,27,2,58000
+
+Save and close.
+
+B. CREATE THE DEPARTMENT INPUT FILE
+
+   nano departments.txt
+
+Paste:
+   1,HR
+   2,Finance
+   3,IT
+
+Save and close.
+
+C. UPLOAD BOTH FILES TO HDFS
+
+Start Hadoop:
+   start-dfs.sh
+   start-yarn.sh
+
+Create the folder:
+   hdfs dfs -mkdir -p /user/cloudera
+
+Upload:
+   hdfs dfs -put -f employees.txt /user/cloudera/
+   hdfs dfs -put -f departments.txt /user/cloudera/
+
+D. CREATE THE PIG SCRIPT
+
+1. Create the file:
+   nano employee_analysis.pig
+
+2. Paste this script:
+
+   -- Load employees
+   employees = LOAD 'hdfs://localhost:9000/user/cloudera/employees.txt'
+   USING PigStorage(',')
+   AS (emp_id:int, name:chararray, age:int, dept_id:int, salary:int);
+
+   -- Load departments
+   departments = LOAD 'hdfs://localhost:9000/user/cloudera/departments.txt'
+   USING PigStorage(',')
+   AS (dept_id:int, dept_name:chararray);
+
+   -- FILTER: keep employees aged 28 or above
+   filtered_employees = FILTER employees BY age >= 28;
+
+   -- PROJECT: show only employee ID, name and salary
+   projected_employees = FOREACH filtered_employees
+   GENERATE emp_id, name, salary;
+
+   -- SORT: highest salary first
+   sorted_employees = ORDER projected_employees BY salary DESC;
+
+   -- GROUP: group all employees by department ID
+   grouped_by_department = GROUP employees BY dept_id;
+
+   -- JOIN: connect employees to department names
+   joined_data = JOIN employees BY dept_id, departments BY dept_id;
+
+   -- Save the three results in HDFS
+   STORE sorted_employees INTO
+   'hdfs://localhost:9000/user/cloudera/output/sorted_employees'
+   USING PigStorage(',');
+
+   STORE grouped_by_department INTO
+   'hdfs://localhost:9000/user/cloudera/output/grouped_by_department'
+   USING PigStorage(',');
+
+   STORE joined_data INTO
+   'hdfs://localhost:9000/user/cloudera/output/joined_data'
+   USING PigStorage(',');
+
+   -- Also print results in the terminal
+   DUMP sorted_employees;
+   DUMP grouped_by_department;
+   DUMP joined_data;
+
+3. Save and close nano.
+
+E. RUN THE SCRIPT
+
+From the same folder, run:
+   pig -x mapreduce employee_analysis.pig
+
+Wait for Pig to finish. It will create three output folders in HDFS.
+
+If you run the script again, first remove old output folders:
+   hdfs dfs -rm -r /user/cloudera/output/sorted_employees
+   hdfs dfs -rm -r /user/cloudera/output/grouped_by_department
+   hdfs dfs -rm -r /user/cloudera/output/joined_data
+
+Then run the Pig command again.
+
+F. VIEW THE SAVED OUTPUT
+
+Sorted output:
+   hdfs dfs -cat /user/cloudera/output/sorted_employees/part-r-00000
+
+Grouped output:
+   hdfs dfs -cat /user/cloudera/output/grouped_by_department/part-r-00000
+
+Joined output:
+   hdfs dfs -cat /user/cloudera/output/joined_data/part-r-00000
+
+EXPECTED OUTPUT - SORTED EMPLOYEES
+
+The script above uses age >= 28, so the selected employees are:
+   103,Anna,75000
+   104,David,62000
+   102,Sam,60000
+   101,John,50000
+
+EXPECTED OUTPUT - GROUPED BY DEPARTMENT
+
+Department 1:
+   101,John,30,1,50000
+   103,Anna,32,1,75000
+
+Department 2:
+   102,Sam,28,2,60000
+   105,Lily,27,2,58000
+
+Department 3:
+   104,David,29,3,62000
+
+EXPECTED OUTPUT - JOINED EMPLOYEES AND DEPARTMENTS
+
+   101,John,30,1,50000,1,HR
+   102,Sam,28,2,60000,2,Finance
+   103,Anna,32,1,75000,1,HR
+   104,David,29,3,62000,3,IT
+   105,Lily,27,2,58000,2,Finance
+
+NOTE ABOUT THE MANUAL
+The text says age > 28, but its screenshot includes Sam, whose age is 28.
+This guide uses age >= 28 so the sorted output matches the screenshot.
+If your teacher wants the written condition exactly, change >= to >; Sam will then
+not appear in the sorted output.
+
+CONCLUSION
+Pig Latin was used to filter, project, sort, group and join the employee data.
